@@ -1,17 +1,27 @@
 import sys
-from defines import *
+import math
 from dataclasses import dataclass
+from defines import *
 
 @dataclass
 class Pos:
     x: int
     y: int
 
+    def __str__(self):
+        return Utilities.double_digit_stringify_int(self.x) + Utilities.double_digit_stringify_int(self.y)
+
+    def __hash__(self):
+        return hash(str(self))
+
     def __eq__(self, other):
         return self.x == other.x and self.y == other.y
 
     def __add__(self, other):
         return Pos(self.x + other.x, self.y + other.y)
+
+    def __sub__(self, other):
+        return Pos(self.x - other.x, self.y - other.y)
 
 class Utilities:
     @staticmethod
@@ -24,6 +34,26 @@ class Utilities:
         box_indeces.sort()
         mapped = map(Utilities.double_digit_stringify_int, box_indeces)
         return "".join(mapped)
+
+    @staticmethod
+    def create_move_and_dir_dictionaries():
+        move2dir = {
+            Pos(-1, 0): 'L',
+            Pos(0, -1): 'U',
+            Pos(1, 0): 'R',
+            Pos(0, 1): 'D',
+        }
+        dir2move = {
+            'L': Pos(-1, 0),
+            'U': Pos(0, -1),
+            'R': Pos(1, 0),
+            'D': Pos(0, 1),
+            'l': Pos(-1, 0),
+            'u': Pos(0, -1),
+            'r': Pos(1, 0),
+            'd': Pos(0, 1),
+        }
+        return move2dir, dir2move
 
     @staticmethod
     def get_num_boxes_and_spaces(rows, cols, environment):
@@ -44,11 +74,9 @@ class Utilities:
         for row in range(rows):
             for col in range(cols):
                 if environment[row][col] != WALL:
-                    rowkey = Utilities.double_digit_stringify_int(row)
-                    colkey = Utilities.double_digit_stringify_int(col)
-                    key = rowkey + colkey
+                    key = Pos(col, row)
                     value += 1
-                    pos2index[sys.intern(key)] = value
+                    pos2index[key] = value
 
         index2pos = {v: k for k, v in pos2index.items()}
         return pos2index, index2pos

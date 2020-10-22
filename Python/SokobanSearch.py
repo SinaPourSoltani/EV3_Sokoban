@@ -1,10 +1,13 @@
-import sys
+from __future__ import annotations
 import numpy as np
-from utilities import Utilities as utils
-from defines import *
 import math
 import time
 from dataclasses import dataclass
+
+from utilities import Utilities as utils
+from utilities import Pos
+from defines import *
+from simulation import Simulation
 
 # position = (row, col)
 # index = 1D position
@@ -20,21 +23,11 @@ from dataclasses import dataclass
 
 @dataclass
 class Node:
+    parent_node: Node
     state: float
     depth: int
     # boxes_state + agent_state / 100
 
-
-@dataclass
-class Pos:
-    x: int
-    y: int
-
-    def __eq__(self, other):
-        return self.x == other.x and self.y == other.y
-
-    def __add__(self, other):
-        return Pos(self.x + other.x, self.y + other.y)
 
 class Search:
     def __init__(self, map_file_path):
@@ -43,13 +36,13 @@ class Search:
         self.cols = 0
         self.environment = []
 
-        self.moves = [Pos(-1, 0), Pos(0, 1), Pos(1, 0), Pos(0, -1)]
+        self.moves = [Pos(-1, 0), Pos(0, -1), Pos(1, 0), Pos(0, 1)]
 
-        self.read_map()
-        self.num_boxes, self.num_spaces,  = utils.get_num_boxes_and_spaces(self.rows, self.cols, self.environment)
+        self.num_boxes, self.num_spaces = self.read_map()
 
         self.pos2index, self.index2pos = utils.create_space_and_index_conversion_dictionaries(self.rows, self.cols, self.environment)
         self.boxes_combi2state, self.boxes_state2combi = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces)
+        self.move2dir, self.dir2move = utils.create_move_and_dir_dictionaries()
 
         self.boxes_state = self.get_state_of_boxes()
         self.agent_state = self.get_state_of_agent()
@@ -75,20 +68,26 @@ class Search:
             for x, el in enumerate(row):
                 self.environment[y][x] = el
 
-    def stringified_pos(self, pos: Pos):
-        return utils.double_digit_stringify_int(pos.y) + utils.double_digit_stringify_int(pos.x)
+        num_boxes = num_spaces = 0
+        for y, row in enumerate(map_rows):
+            for x, el in enumerate(row):
+                if self.environment[y][x] == BOX:
+                    num_boxes += 1
+                if self.environment[y][x] != WALL:
+                    num_spaces += 1
+        return num_boxes, num_spaces
 
     def print_environment(self,node: Node):
         for row in range(self.rows):
             for col in range(self.cols):
                 el = Pos(col,row)
-                if self.pos2index.get(self.stringified_pos(el)) is None:
+                if self.pos2index.get(el) is None:
                     self.environment[row][col] = WALL
                 else:
                     self.environment[row][col] = PASSAGE
 
         agent_state = round((node.state % 1) * 100)
-        agent_pos = self.get_pos_from_index(agent_state)
+        agent_pos = self.index2pos[agent_state]
 
         boxes_state = math.floor(node.state)
         boxes_combi = self.boxes_state2combi[boxes_state]
@@ -101,35 +100,24 @@ class Search:
 
         print(self.environment)
 
-    def get_pos_from_index(self,index):
-        pos = self.index2pos[index]
-        row = int(pos[:2])
-        col = int(pos[2:])
-        return Pos(col, row)
-
     def get_state_of_boxes(self):
-        box_pos = ''
+        box_combi = ''
         for row in range(self.rows):
             for col in range(self.cols):
                 if self.environment[row][col] == BOX:
-                    row_key = utils.double_digit_stringify_int(row)
-                    col_key = utils.double_digit_stringify_int(col)
-                    key = row_key + col_key
+                    key = Pos(col, row)
                     index = self.pos2index[key]
                     index_key = utils.double_digit_stringify_int(index)
-                    box_pos += index_key
-        return self.boxes_combi2state[box_pos]
+                    box_combi += index_key
+        return self.boxes_combi2state[box_combi]
 
     def get_state_of_agent(self):
         agent_index = 0
         for row in range(self.rows):
             for col in range(self.cols):
                 if self.environment[row][col] == AGENT:
-                    row_key = utils.double_digit_stringify_int(row)
-                    col_key = utils.double_digit_stringify_int(col)
-                    key = row_key + col_key
+                    key = Pos(col, row)
                     agent_index = self.pos2index[key]
-
         return agent_index
 
     def get_goal_state(self):
@@ -137,9 +125,7 @@ class Search:
         for row in range(self.rows):
             for col in range(self.cols):
                 if self.environment[row][col] == GOAL:
-                    row_key = utils.double_digit_stringify_int(row)
-                    col_key = utils.double_digit_stringify_int(col)
-                    key = row_key + col_key
+                    key = Pos(col, row)
                     index = self.pos2index[key]
                     index_key = utils.double_digit_stringify_int(index)
                     goal_pos += index_key
@@ -149,18 +135,18 @@ class Search:
         box_indeces = [int(index[i:i + 2]) for i in range(0, len(index), 2)]
         box_positions = []
         for box_index in box_indeces:
-            box_positions.append(self.get_pos_from_index(box_index))
+            box_positions.append(self.index2pos[box_index])
         return box_positions
 
     def get_combi_from_box_positions(self, positions):
         combi = ''
         for pos in positions:
-            combi += utils.double_digit_stringify_int(self.pos2index.get(self.stringified_pos(pos),99))
+            combi += utils.double_digit_stringify_int(self.pos2index.get(pos, 99))
         return utils.get_sorted_indeces(combi)
 
     def generate_children(self, node: Node):
         agent_state = round((node.state % 1) * 100)
-        agent_pos = self.get_pos_from_index(agent_state)
+        agent_pos = self.index2pos[agent_state]
 
         boxes_state = math.floor(node.state)
         boxes_combi = self.boxes_state2combi[boxes_state]
@@ -170,7 +156,7 @@ class Search:
 
         for move in self.moves:
             next_agent_pos = agent_pos + move
-            new_agent_state = self.pos2index.get(self.stringified_pos(next_agent_pos))
+            new_agent_state = self.pos2index.get(next_agent_pos)
             if new_agent_state is None:
                 continue
 
@@ -189,7 +175,7 @@ class Search:
                 continue
 
             new_state = new_boxes_state + new_agent_state / 100
-            children.append(Node(new_state,node.depth + 1))
+            children.append(Node(node, new_state, node.depth + 1))
 
         return children
 
@@ -198,10 +184,41 @@ class Search:
             #  Move boxes if agent index == box index. If new box combinations does not exist in dictionary. It is
             #  invalid.
 
+    def find_path(self, node: Node):
+        visited_states = [node.state]
+        while node.parent_node is not None:
+            node = node.parent_node
+            visited_states.append(node.state)
+
+        visited_states.reverse()
+
+        moves = ""
+        for i, state in enumerate(visited_states):
+            if i != len(visited_states) - 1:
+                agent_index = round((state % 1) * 100)
+                agent_pos = self.index2pos[agent_index]
+
+                next_state = visited_states[i+1]
+                next_agent_index = round((next_state % 1) * 100)
+                next_agent_pos = self.index2pos[next_agent_index]
+
+                move = next_agent_pos - agent_pos
+
+                boxes_moved = math.floor(next_state) != math.floor(state)
+
+                dir = self.move2dir[move] if boxes_moved else self.move2dir[move].lower()
+                moves += dir
+        return moves
+
+    def solution_found(self, solution: str):
+        sim = Simulation(self.environment, self.index2pos[self.agent_state], solution)
+        print("Press SPACE to run simulation.")
+        sim.run()
+
     def BFS(self):
         init_state = self.boxes_state + self.agent_state / 100
         depth = 0
-        root = Node(init_state,depth)
+        root = Node(None, init_state, depth)
         self.to_be_visited.append(root)
 
         while self.to_be_visited:
@@ -214,6 +231,8 @@ class Search:
             self.visited_nodes[c_node.state] = 1
             if math.floor(c_node.state) == self.goal_state:
                 print("Found goal state. WIN :)")
+                solution = self.find_path(c_node)
+                self.solution_found(solution)
                 break
 
             children = self.generate_children(c_node)
@@ -228,5 +247,5 @@ class Search:
                 if self.visited_nodes.get(child.state) is None:
                     self.to_be_visited.append(child)
 
-s = Search('../map.txt')
+s = Search('../map1.txt')
 s.BFS()
