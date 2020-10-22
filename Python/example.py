@@ -5,7 +5,7 @@ from time import sleep
 
 import signal
 
-mA = ev3.LargeMotor('outA')
+mA = ev3.LargeMotor('outC')
 mB = ev3.LargeMotor('outD')
 
 THRESHOLD_LEFT = 30 
