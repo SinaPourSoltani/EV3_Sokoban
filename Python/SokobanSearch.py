@@ -1,4 +1,5 @@
 from __future__ import annotations
+from _collections import deque
 import numpy as np
 import math
 import time
@@ -41,7 +42,7 @@ class Search:
         self.num_boxes, self.num_spaces = self.read_map()
 
         self.pos2index, self.index2pos = utils.create_space_and_index_conversion_dictionaries(self.rows, self.cols, self.environment)
-        self.boxes_combi2state, self.boxes_state2combi = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces)
+        self.boxes_positions2state, self.boxes_state2positions = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces,self.index2pos)
         self.move2dir, self.dir2move = utils.create_move_and_dir_dictionaries()
 
         self.boxes_state = self.get_state_of_boxes()
@@ -50,12 +51,9 @@ class Search:
         assert self.num_spaces < 100
         assert self.agent_state > 0
         assert len(self.pos2index.keys()) == self.num_spaces
-        assert len(self.boxes_combi2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
+        assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
 
         self.goal_state = self.get_goal_state()
-
-        self.to_be_visited = []
-        self.visited_nodes = {}
 
     def read_map(self):
         map_file = open(self.map_file_path, 'r')
@@ -90,8 +88,7 @@ class Search:
         agent_pos = self.index2pos[agent_state]
 
         boxes_state = math.floor(node.state)
-        boxes_combi = self.boxes_state2combi[boxes_state]
-        boxes_positions = self.get_positions_of_boxes(boxes_combi)
+        boxes_positions = self.boxes_state2positions[boxes_state]
 
         self.environment[agent_pos.y][agent_pos.x] = AGENT
 
@@ -101,15 +98,14 @@ class Search:
         print(self.environment)
 
     def get_state_of_boxes(self):
-        box_combi = ''
+        box_positions = ()
         for row in range(self.rows):
             for col in range(self.cols):
                 if self.environment[row][col] == BOX:
-                    key = Pos(col, row)
-                    index = self.pos2index[key]
-                    index_key = utils.double_digit_stringify_int(index)
-                    box_combi += index_key
-        return self.boxes_combi2state[box_combi]
+                    key = Pos(col, row),
+                    box_positions += key
+        box_positions = tuple(sorted(box_positions))
+        return self.boxes_positions2state[box_positions]
 
     def get_state_of_agent(self):
         agent_index = 0
@@ -121,36 +117,21 @@ class Search:
         return agent_index
 
     def get_goal_state(self):
-        goal_pos = ''
+        goal_positions = ()
         for row in range(self.rows):
             for col in range(self.cols):
                 if self.environment[row][col] == GOAL:
-                    key = Pos(col, row)
-                    index = self.pos2index[key]
-                    index_key = utils.double_digit_stringify_int(index)
-                    goal_pos += index_key
-        return self.boxes_combi2state[goal_pos]
-
-    def get_positions_of_boxes(self,index: str):
-        box_indeces = [int(index[i:i + 2]) for i in range(0, len(index), 2)]
-        box_positions = []
-        for box_index in box_indeces:
-            box_positions.append(self.index2pos[box_index])
-        return box_positions
-
-    def get_combi_from_box_positions(self, positions):
-        combi = ''
-        for pos in positions:
-            combi += utils.double_digit_stringify_int(self.pos2index.get(pos, 99))
-        return utils.get_sorted_indeces(combi)
+                    key = Pos(col, row),
+                    goal_positions += key
+        goal_positions = tuple(sorted(goal_positions))
+        return self.boxes_positions2state[goal_positions]
 
     def generate_children(self, node: Node):
         agent_state = round((node.state % 1) * 100)
         agent_pos = self.index2pos[agent_state]
 
         boxes_state = math.floor(node.state)
-        boxes_combi = self.boxes_state2combi[boxes_state]
-        boxes_positions = self.get_positions_of_boxes(boxes_combi)
+        boxes_positions = self.boxes_state2positions[boxes_state]
 
         children = []
 
@@ -160,22 +141,22 @@ class Search:
             if new_agent_state is None:
                 continue
 
-            new_boxes_positions = []
+            new_boxes_positions = ()
             for box_pos in boxes_positions:
                 if next_agent_pos == box_pos:
                     new_box_pos = box_pos + move
-                    new_boxes_positions.append(new_box_pos)
+                    new_boxes_positions += new_box_pos,
                 else:
-                    new_boxes_positions.append(box_pos)
+                    new_boxes_positions += box_pos,
 
-            combi = self.get_combi_from_box_positions(new_boxes_positions)
-
-            new_boxes_state = self.boxes_combi2state.get(combi)
+            new_boxes_positions = tuple(sorted(new_boxes_positions))
+            new_boxes_state = self.boxes_positions2state.get(new_boxes_positions)
             if new_boxes_state is None:
                 continue
 
             new_state = new_boxes_state + new_agent_state / 100
             children.append(Node(node, new_state, node.depth + 1))
+
 
         return children
 
@@ -219,16 +200,18 @@ class Search:
         init_state = self.boxes_state + self.agent_state / 100
         depth = 0
         root = Node(None, init_state, depth)
-        self.to_be_visited.append(root)
+        to_be_visited = deque([root])
+        visited_nodes = {}
 
-        while self.to_be_visited:
+        while to_be_visited:
+            #print(to_be_visited)
             #print(self.to_be_visited)
             #print(self.visited_nodes)
-            c_node = self.to_be_visited.pop(0)
-            # TODO maybe make own stack
-            #print(c_node)
+            c_node = to_be_visited.popleft()
+            #print("Prnt",c_node.parent_node.state if c_node.parent_node is not None else "None")
+            #print("Crnt", c_node.state)
             #self.print_environment(c_node)
-            self.visited_nodes[c_node.state] = 1
+            visited_nodes[c_node.state] = 1
             if math.floor(c_node.state) == self.goal_state:
                 print("Found goal state. WIN :)")
                 solution = self.find_path(c_node)
@@ -242,10 +225,10 @@ class Search:
             for child in children:
                 if child.depth > depth:
                     print(depth)
-                    print(len(self.visited_nodes.keys()))
+                    print(len(visited_nodes.keys()))
                     depth = child.depth
-                if self.visited_nodes.get(child.state) is None:
-                    self.to_be_visited.append(child)
+                if visited_nodes.get(child.state) is None:
+                    to_be_visited.append(child)
 
 s = Search('../map1.txt')
 s.BFS()

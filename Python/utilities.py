@@ -23,6 +23,12 @@ class Pos:
     def __sub__(self, other):
         return Pos(self.x - other.x, self.y - other.y)
 
+    def __lt__(self, other):
+        return (self.x + self.y) < (other.x + other.y)
+
+    def __gt__(self, other):
+        return (self.x + self.y) > (other.x + other.y)
+
 class Utilities:
     @staticmethod
     def double_digit_stringify_int(num):
@@ -82,20 +88,20 @@ class Utilities:
         return pos2index, index2pos
 
     @staticmethod
-    def create_boxes_combinatorics_conversion_dictionaries(num_spaces):
+    def create_boxes_combinatorics_conversion_dictionaries(num_spaces, index2pos):
         boxes_index2states = {}
         value = 0
         for n1 in range(1, num_spaces + 1):
             for n2 in range(n1 + 1, num_spaces + 1):
                 for n3 in range(n2 + 1, num_spaces + 1):
                     for n4 in range(n3 + 1, num_spaces + 1):
-                        key1 = Utilities.double_digit_stringify_int(n1)
-                        key2 = Utilities.double_digit_stringify_int(n2)
-                        key3 = Utilities.double_digit_stringify_int(n3)
-                        key4 = Utilities.double_digit_stringify_int(n4)
-                        key = key1 + key2 + key3 + key4
+                        key1 = index2pos[n1]
+                        key2 = index2pos[n2]
+                        key3 = index2pos[n3]
+                        key4 = index2pos[n4]
+                        key = tuple(sorted((key1, key2, key3, key4)))
                         value += 1
-                        boxes_index2states[sys.intern(key)] = value
+                        boxes_index2states[key] = value
 
         boxes_states2index = {v: k for k, v in boxes_index2states.items()}
         return boxes_index2states, boxes_states2index
