@@ -9,6 +9,9 @@ from utilities import Utilities as utils
 from utilities import Pos
 from defines import *
 from simulation import Simulation
+from simulation import Display
+import pygame
+from pygame.locals import *
 
 # position = (row, col)
 # index = 1D position
@@ -29,6 +32,15 @@ class Node:
     depth: int
     # boxes_state + agent_state / 100
 
+
+def wait():
+    while True:
+        for event in pygame.event.get():
+            if event.type == QUIT:
+                pygame.quit()
+                exit()
+            if event.type == KEYDOWN and event.key == K_SPACE:
+                return
 
 class Search:
     def __init__(self, map_file_path):
@@ -54,6 +66,9 @@ class Search:
         assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
 
         self.goal_state = self.get_goal_state()
+
+        self.display = Display((self.cols, self.rows))
+        self.display.update(self.environment, self.index2pos[self.agent_state])
 
     def read_map(self):
         map_file = open(self.map_file_path, 'r')
@@ -141,6 +156,7 @@ class Search:
             if new_agent_state is None:
                 continue
 
+            s = time.time()
             new_boxes_positions = ()
             for box_pos in boxes_positions:
                 if next_agent_pos == box_pos:
@@ -156,7 +172,6 @@ class Search:
 
             new_state = new_boxes_state + new_agent_state / 100
             children.append(Node(node, new_state, node.depth + 1))
-
 
         return children
 
@@ -191,7 +206,20 @@ class Search:
                 moves += dir
         return moves
 
+    def trail(self, node: Node):
+        trail = []
+
+        c_node = node
+        while c_node.parent_node is not None:
+            c_node = c_node.parent_node
+            agent_state = round((c_node.state % 1) * 100)
+            agent_pos = self.index2pos[agent_state]
+            trail.append(agent_pos)
+
+        return trail
+
     def solution_found(self, solution: str):
+        print("Solution:", solution)
         sim = Simulation(self.environment, self.index2pos[self.agent_state], solution)
         print("Press SPACE to run simulation.")
         sim.run()
@@ -211,6 +239,12 @@ class Search:
             #print("Prnt",c_node.parent_node.state if c_node.parent_node is not None else "None")
             #print("Crnt", c_node.state)
             #self.print_environment(c_node)
+            #indexx = round((c_node.state % 1) * 100)
+            #poss = self.index2pos[indexx]
+            #trail = self.trail(c_node)
+            #print("Agent_i:",indexx, "_pos:",poss)
+            #self.display.update(self.environment, poss, trail)
+            #wait()
             visited_nodes[c_node.state] = 1
             if math.floor(c_node.state) == self.goal_state:
                 print("Found goal state. WIN :)")
@@ -229,6 +263,7 @@ class Search:
                     depth = child.depth
                 if visited_nodes.get(child.state) is None:
                     to_be_visited.append(child)
+        print(visited_nodes)
 
-s = Search('../map1.txt')
+s = Search('../map.txt')
 s.BFS()

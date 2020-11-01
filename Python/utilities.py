@@ -3,6 +3,9 @@ import math
 from dataclasses import dataclass
 from defines import *
 
+COLS = 0
+ROWS = 0
+
 @dataclass
 class Pos:
     x: int
@@ -24,10 +27,10 @@ class Pos:
         return Pos(self.x - other.x, self.y - other.y)
 
     def __lt__(self, other):
-        return (self.x + self.y) < (other.x + other.y)
+        return (self.y * COLS + self.x) < (other.y * COLS + other.x)
 
     def __gt__(self, other):
-        return (self.x + self.y) > (other.x + other.y)
+        return (self.y * COLS + self.x) > (other.y * COLS + other.x)
 
 class Utilities:
     @staticmethod
@@ -77,6 +80,9 @@ class Utilities:
     def create_space_and_index_conversion_dictionaries(rows, cols, environment):
         value = 0
         pos2index = {}
+        global COLS, ROWS
+        COLS = cols
+        ROWS = rows
         for row in range(rows):
             for col in range(cols):
                 if environment[row][col] != WALL:

@@ -57,7 +57,7 @@ class Display:
                 pygame.draw.rect(self.display, BLACK,
                                  [col * self.tile_size, row * self.tile_size, self.tile_size, self.tile_size], 1)
 
-    def update(self, environment, agent_pos: Pos):
+    def update(self, environment, agent_pos: Pos, trail=None):
         self.display.fill(WHITE)
         self.draw_grid()
 
@@ -79,6 +79,22 @@ class Display:
                     pygame.draw.rect(self.display, GREEN, [col * self.tile_size + self.tile_size * 0.1,
                                                            row * self.tile_size + self.tile_size * 0.1,
                                                            self.tile_size * 0.8, self.tile_size * 0.8])
+
+        if trail is not None:
+            for i, pos in enumerate(trail):
+                col = pos.x
+                row = pos.y
+
+                pygame.draw.circle(self.display, PURPLE,
+                                   (col * self.tile_size + 0.5 * self.tile_size,
+                                    row * self.tile_size + 0.5 * self.tile_size),
+                                   self.tile_size * 0.3)
+
+                s = pygame.Surface((self.tile_size, self.tile_size))  # the size of your rect
+                s.set_alpha(130 + i * 8)
+                s.fill((255, 255, 255))
+                self.display.blit(s, (col * self.tile_size,
+                                    row * self.tile_size))
 
         col = agent_pos.x
         row = agent_pos.y
