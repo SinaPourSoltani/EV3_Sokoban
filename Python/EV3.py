@@ -198,6 +198,6 @@ class EV3:
             else:
                 self.park()
 
-#solution = "lllldlluRRRRRdrUUruulldRRlddllllUdrruLuulldDRddlluRRRRRdrUUruulldRurDurrdLulldddllllluuurDDldRRRRdrUUdlllluurDldRRRdrU" + END
+#solution = "llllUddlluRRRRRdrUUruulldRRlddlluLuulldRurDDullDRdRRRdrUUruurrdLulDulldRddlllluurDldRRRdrUUdlllldlluRRRRRdrU" + END
 solution = "uRRlld"
 eve = EV3(DOWN,solution)
