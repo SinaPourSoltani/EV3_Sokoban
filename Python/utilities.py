@@ -65,18 +65,6 @@ class Utilities:
         return move2dir, dir2move
 
     @staticmethod
-    def get_num_boxes_and_spaces(rows, cols, environment):
-        boxes = 0
-        spaces = 0
-        for row in range(rows):
-            for col in range(cols):
-                if environment[row][col] == BOX:
-                    boxes += 1
-                if environment[row][col] != WALL:
-                    spaces += 1
-        return boxes, spaces
-
-    @staticmethod
     def create_space_and_index_conversion_dictionaries(rows, cols, environment):
         value = 0
         pos2index = {}

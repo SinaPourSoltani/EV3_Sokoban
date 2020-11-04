@@ -156,7 +156,6 @@ class Search:
             if new_agent_state is None:
                 continue
 
-            s = time.time()
             new_boxes_positions = ()
             for box_pos in boxes_positions:
                 if next_agent_pos == box_pos:
