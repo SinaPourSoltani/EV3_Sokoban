@@ -1,3 +1,4 @@
+from copy import deepcopy
 import pygame
 from pygame.locals import *
 from defines import *
@@ -8,35 +9,44 @@ from utilities import Utilities as utils
 class Simulation:
     def __init__(self, env, agent_pos: Pos, solution: str):
         self.env = env
+        self.init_env = env
         self.rows, self.cols = env.shape
         self.agent_pos = agent_pos
+        self.init_agent_pos = agent_pos
         self.solution = solution
 
         self.move2dir, self.dir2move = utils.create_move_and_dir_dictionaries()
         self.display = Display((self.cols, self.rows))
-        print("display")
         self.display.update(self.env, self.agent_pos)
 
     def set_environment(self, move: Pos):
         self.agent_pos += move
 
-        if self.env[self.agent_pos.y][self.agent_pos.x] == BOX:
-            self.env[self.agent_pos.y][self.agent_pos.x] = PASSAGE
-            self.env[self.agent_pos.y + move.y][self.agent_pos.x + move.x] = BOX
+        if self.env[self.agent_pos.y][self.agent_pos.x] == BOX or self.env[self.agent_pos.y][self.agent_pos.x] == GOAL_FILLED:
+            self.env[self.agent_pos.y][self.agent_pos.x] = GOAL if self.env[self.agent_pos.y][self.agent_pos.x] == GOAL_FILLED else PASSAGE
+
+            if self.env[self.agent_pos.y + move.y][self.agent_pos.x + move.x] == GOAL:
+                self.env[self.agent_pos.y + move.y][self.agent_pos.x + move.x] = GOAL_FILLED
+            else:
+                self.env[self.agent_pos.y + move.y][self.agent_pos.x + move.x] = BOX
 
     def run(self):
-        while True:
+        is_running = True
+        while is_running:
             for event in pygame.event.get():
-                if event.type == QUIT:
+                if event.type == QUIT or event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
                     pygame.quit()
-                    exit()
+                    is_running = False
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
+                        self.env = deepcopy(self.init_env)
+                        self.agent_pos = self.init_agent_pos
+                        self.display.update(self.env,self.agent_pos)
                         for c in self.solution:
                             move = self.dir2move[c]
                             self.set_environment(move)
                             self.display.update(self.env, self.agent_pos)
-                            pygame.time.Clock().tick(10)
+                            pygame.time.Clock().tick(15)
 
 
 

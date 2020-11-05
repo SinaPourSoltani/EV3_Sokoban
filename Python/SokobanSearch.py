@@ -1,9 +1,12 @@
 from __future__ import annotations
 from _collections import deque
+import os
+os.environ['PYGAME_HIDE_SUPPORT_PROMPT'] = "hide"
 import numpy as np
 import math
-import time
 from dataclasses import dataclass
+from copy import deepcopy
+
 
 from utilities import Utilities as utils
 from utilities import Pos
@@ -12,6 +15,7 @@ from simulation import Simulation
 from simulation import Display
 import pygame
 from pygame.locals import *
+from enum import Enum
 
 # position = (row, col)
 # index = 1D position
@@ -25,12 +29,25 @@ from pygame.locals import *
 # '13142122'
 
 
+class Algorithms(Enum):
+    BFS = "BFS"
+    DFS = "DFS"
+    AStar = "A*"
+
+
 @dataclass
 class Node:
     parent_node: Node
     state: float
     depth: int
+    cost: float
     # boxes_state + agent_state / 100
+
+    def __lt__(self, other):
+        return self.cost < other.cost
+
+    def __gt__(self, other):
+        return self.cost > other.cost
 
 
 def wait():
@@ -52,6 +69,7 @@ class Search:
         self.moves = [Pos(-1, 0), Pos(0, -1), Pos(1, 0), Pos(0, 1)]
 
         self.num_boxes, self.num_spaces = self.read_map()
+        self.initial_environment = self.environment
 
         self.corners = self.detect_corners()
 
@@ -62,12 +80,17 @@ class Search:
         self.boxes_state = self.get_state_of_boxes()
         self.agent_state = self.get_state_of_agent()
 
+        self.to_be_visited = deque()
+        self.to_be_visited_lookup = {}
+        self.visited_nodes = {}
+
         assert self.num_spaces < 100
         assert self.agent_state > 0
         assert len(self.pos2index.keys()) == self.num_spaces
         assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
 
         self.goal_state = self.get_goal_state()
+        self.goal_positions = self.boxes_state2positions[self.goal_state]
 
         self.display = Display((self.cols, self.rows))
         self.display.update(self.environment, self.index2pos[self.agent_state])
@@ -158,7 +181,37 @@ class Search:
         goal_positions = tuple(sorted(goal_positions))
         return self.boxes_positions2state[goal_positions]
 
-    def generate_children(self, node: Node):
+    def calculate_cost(self, box_positions, agent_pos, depth):
+        cost = 0
+
+        box_cost = 0
+        for box in box_positions:
+            box_goal_distance = 0
+            for goal in self.goal_positions:
+                distance = abs(box.x - goal.x) + abs(box.y - goal.y)
+                if not distance:
+                    box_goal_distance = 0
+                    break
+                box_goal_distance += 10 * distance
+
+            box_goal_distance /= len(self.goal_positions)
+            box_cost += box_goal_distance
+
+        box_cost /= len(box_positions)
+
+        agent_box_distance = 0
+        for box in box_positions:
+            agent_box_distance += abs(agent_pos.x - box.x) + abs(agent_pos.y - box.y)
+
+        agent_box_distance /= len(box_positions)
+
+        agent_cost = 2 * depth / self.num_spaces # agent_box_distance / (depth + 1) + depth / agent_box_distance
+
+        cost = box_cost + agent_cost
+
+        return cost
+
+    def generate_children(self, node: Node, with_cost=False):
         agent_state = round((node.state % 1) * 100)
         agent_pos = self.index2pos[agent_state]
 
@@ -189,7 +242,10 @@ class Search:
                 continue
 
             new_state = new_boxes_state + new_agent_state / 100
-            children.append(Node(node, new_state, node.depth + 1))
+            cost = 0
+            if with_cost:
+                cost = self.calculate_cost(boxes_positions, next_agent_pos, node.depth)
+            children.append(Node(node, new_state, node.depth + 1, cost))
 
         return children
 
@@ -238,60 +294,64 @@ class Search:
 
     def solution_found(self, solution: str):
         print("Solution:", solution)
+        print("# Moves:",len(solution))
+        print("# Visited nodes:",len(self.visited_nodes))
+        print("# To be visited nodes:",len(self.to_be_visited))
         sim = Simulation(self.environment, self.index2pos[self.agent_state], solution)
-        print("Press SPACE to run simulation.")
+        #print("Press SPACE to run simulation.")
         sim.run()
 
-    def BFS(self):
+    def insert(self, child: Node):
+        insertion_point = 0
+        for i, el in enumerate(self.to_be_visited):
+            if child.cost >= el.cost:
+                insertion_point = i + 1
+            else:
+                break
+
+        self.to_be_visited.insert(insertion_point, child)
+
+    def search(self, algorithm: Algorithms):
+        print("\nRunning", algorithm.value, "...")
+
+        self.environment = deepcopy(self.initial_environment)
         init_state = self.boxes_state + self.agent_state / 100
-        depth = 0
-        root = Node(None, init_state, depth)
-        to_be_visited = deque([root])
-        to_be_visited_lookup = {}
-        visited_nodes = {}
+        root = Node(None, init_state, 0, 0)
+        self.to_be_visited = deque([root])
+        self.to_be_visited_lookup = {}
+        self.visited_nodes = {}
 
+        while self.to_be_visited:
 
-        while to_be_visited:
-            #print(to_be_visited)
-            #print(self.to_be_visited)
-            #print(self.visited_nodes)
+            c_node = self.to_be_visited.popleft()
 
-            c_node = to_be_visited.popleft()
-
-            #print("Prnt",c_node.parent_node.state if c_node.parent_node is not None else "None")
-            #print("Crnt", c_node.state)
-            #self.print_environment(c_node)
-            #indexx = round((c_node.state % 1) * 100)
-            #poss = self.index2pos[indexx]
-            #trail = self.trail(c_node)
-            #print("Agent_i:",indexx, "_pos:",poss)
-            #self.display.update(self.environment, poss, trail)
-            #wait()
-
-            visited_nodes[c_node.state] = 1
+            self.visited_nodes[c_node.state] = 1
             if math.floor(c_node.state) == self.goal_state:
                 print("Found goal state. WIN :)")
                 solution = self.find_path(c_node)
                 self.solution_found(solution)
                 break
 
-            children = self.generate_children(c_node)
+            children = self.generate_children(c_node, with_cost=(algorithm == Algorithms.AStar))
 
             # appending the new node to the to be visited list will make it a breath first search (FIFO)
             # adding the new node to the front of the to be visited list will make it depth first search (LIFO)
-            # appendleft for DFS
-            for child in children:
-                if child.depth > depth:
-                    print(depth)
-                    print(len(visited_nodes.keys()))
-                    depth = child.depth
-                if visited_nodes.get(child.state) is None:
-                    # check look up of to_be_visited states to avoid adding duplicate states
-                    if to_be_visited_lookup.get(child.state) is None:
-                        to_be_visited.appendleft(child)
-                        to_be_visited_lookup[child.state] = 1
 
-        print(visited_nodes)
+            for child in children:
+                if self.visited_nodes.get(child.state) is None:
+                    # check look up of to_be_visited states to avoid adding duplicate states
+                    if self.to_be_visited_lookup.get(child.state) is None:
+                        if algorithm == Algorithms.BFS:
+                            self.to_be_visited.append(child)
+                        elif algorithm == Algorithms.DFS:
+                            self.to_be_visited.appendleft(child)
+                        elif algorithm == Algorithms.AStar:
+                            self.insert(child)
+                        else:
+                            raise RuntimeError("Choose an algorithm for the search.")
+                        self.to_be_visited_lookup[child.state] = 1
 
 s = Search('../map.txt')
-s.BFS()
+s.search(Algorithms.BFS)
+s.search(Algorithms.DFS)
+s.search(Algorithms.AStar)
