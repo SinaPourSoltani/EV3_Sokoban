@@ -17,6 +17,8 @@ import pygame
 from pygame.locals import *
 from enum import Enum
 
+from MapGenerator import MapGenerator
+
 # position = (row, col)
 # index = 1D position
 
@@ -87,7 +89,7 @@ class Search:
         assert self.num_spaces < 100
         assert self.agent_state > 0
         assert len(self.pos2index.keys()) == self.num_spaces
-        assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
+        #assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
 
         self.goal_state = self.get_goal_state()
         self.goal_positions = self.boxes_state2positions[self.goal_state]
@@ -352,8 +354,13 @@ class Search:
                         self.to_be_visited_lookup[child.state] = 1
 
 
-map_path = os.path.join(os.path.pardir, "maps", "map1.txt")
-s = Search(map_path)
-s.search(Algorithms.BFS)
-s.search(Algorithms.DFS)
-s.search(Algorithms.AStar)
+
+
+while True:
+    mg = MapGenerator(10,10)
+    #map_path = os.path.join(os.path.pardir, "maps", "map.txt")
+    s = Search("generated_map.txt")
+    #s.search(Algorithms.BFS)
+    #s.search(Algorithms.DFS)
+    s.search(Algorithms.AStar)
+    input()
