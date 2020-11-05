@@ -74,7 +74,7 @@ class Search:
         self.corners = self.detect_corners()
 
         self.pos2index, self.index2pos = utils.create_space_and_index_conversion_dictionaries(self.rows, self.cols, self.environment)
-        self.boxes_positions2state, self.boxes_state2positions = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces,self.index2pos,self.corners)
+        self.boxes_positions2state, self.boxes_state2positions = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces,self.num_boxes,self.index2pos,self.corners)
         self.move2dir, self.dir2move = utils.create_move_and_dir_dictionaries()
 
         self.boxes_state = self.get_state_of_boxes()
@@ -351,7 +351,9 @@ class Search:
                             raise RuntimeError("Choose an algorithm for the search.")
                         self.to_be_visited_lookup[child.state] = 1
 
-s = Search('../map.txt')
+
+map_path = os.path.join(os.path.pardir, "maps", "map1.txt")
+s = Search(map_path)
 s.search(Algorithms.BFS)
 s.search(Algorithms.DFS)
 s.search(Algorithms.AStar)

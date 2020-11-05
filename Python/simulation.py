@@ -96,9 +96,9 @@ class Display:
                 row = pos.y
 
                 pygame.draw.circle(self.display, PURPLE,
-                                   (col * self.tile_size + 0.5 * self.tile_size,
-                                    row * self.tile_size + 0.5 * self.tile_size),
-                                   self.tile_size * 0.3)
+                                   (int(col * self.tile_size + 0.5 * self.tile_size),
+                                    int(row * self.tile_size + 0.5 * self.tile_size)),
+                                   int(self.tile_size * 0.3))
 
                 s = pygame.Surface((self.tile_size, self.tile_size))  # the size of your rect
                 s.set_alpha(130 + i * 8)
@@ -109,8 +109,9 @@ class Display:
         col = agent_pos.x
         row = agent_pos.y
         pygame.draw.circle(self.display, PURPLE,
-                           (col * self.tile_size + 0.5 * self.tile_size, row * self.tile_size + 0.5 * self.tile_size),
-                           self.tile_size * 0.3)
+                           (int(col * self.tile_size + 0.5 * self.tile_size),
+                            int(row * self.tile_size + 0.5 * self.tile_size)),
+                           int(self.tile_size * 0.3))
 
         pygame.display.update()
 
