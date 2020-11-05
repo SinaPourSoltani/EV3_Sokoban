@@ -82,20 +82,30 @@ class Utilities:
         return pos2index, index2pos
 
     @staticmethod
-    def create_boxes_combinatorics_conversion_dictionaries(num_spaces, index2pos):
+    def create_boxes_combinatorics_conversion_dictionaries(num_spaces, index2pos, corners):
         boxes_index2states = {}
         value = 0
         for n1 in range(1, num_spaces + 1):
             for n2 in range(n1 + 1, num_spaces + 1):
                 for n3 in range(n2 + 1, num_spaces + 1):
                     for n4 in range(n3 + 1, num_spaces + 1):
+                        is_deadlock = False
+
                         key1 = index2pos[n1]
                         key2 = index2pos[n2]
                         key3 = index2pos[n3]
                         key4 = index2pos[n4]
                         key = tuple(sorted((key1, key2, key3, key4)))
                         value += 1
-                        boxes_index2states[key] = value
+
+                        for corner in corners:
+                            for k in key:
+                                if corner == k:
+                                    is_deadlock = True
+
+                        dict_value = -1 * value if is_deadlock else value
+                        boxes_index2states[key] = dict_value
 
         boxes_states2index = {v: k for k, v in boxes_index2states.items()}
         return boxes_index2states, boxes_states2index
+

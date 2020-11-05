@@ -53,8 +53,10 @@ class Search:
 
         self.num_boxes, self.num_spaces = self.read_map()
 
+        self.corners = self.detect_corners()
+
         self.pos2index, self.index2pos = utils.create_space_and_index_conversion_dictionaries(self.rows, self.cols, self.environment)
-        self.boxes_positions2state, self.boxes_state2positions = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces,self.index2pos)
+        self.boxes_positions2state, self.boxes_state2positions = utils.create_boxes_combinatorics_conversion_dictionaries(self.num_spaces,self.index2pos,self.corners)
         self.move2dir, self.dir2move = utils.create_move_and_dir_dictionaries()
 
         self.boxes_state = self.get_state_of_boxes()
@@ -89,6 +91,21 @@ class Search:
                 if self.environment[y][x] != WALL:
                     num_spaces += 1
         return num_boxes, num_spaces
+
+    def detect_corners(self):
+        corners = []
+        for y in range(self.rows):
+            for x in range(self.cols):
+                if self.environment[y][x] != WALL and self.environment[y][x] != GOAL:
+                    num_surrounding_walls = 0
+                    env_pos = Pos(x,y)
+                    for move in self.moves:
+                        surrounding_space = env_pos + move
+                        if self.environment[surrounding_space.y][surrounding_space.x] == WALL:
+                            num_surrounding_walls += 1
+                    if num_surrounding_walls >= 2:
+                        corners.append(env_pos)
+        return corners
 
     def print_environment(self,node: Node):
         for row in range(self.rows):
@@ -166,7 +183,9 @@ class Search:
 
             new_boxes_positions = tuple(sorted(new_boxes_positions))
             new_boxes_state = self.boxes_positions2state.get(new_boxes_positions)
-            if new_boxes_state is None:
+            # If new_boxes_state is None it means that the boxes positions are not possible
+            # if new_boxes_state is negative it indicates a deadlock
+            if new_boxes_state is None or new_boxes_state < 0:
                 continue
 
             new_state = new_boxes_state + new_agent_state / 100
@@ -228,13 +247,17 @@ class Search:
         depth = 0
         root = Node(None, init_state, depth)
         to_be_visited = deque([root])
+        to_be_visited_lookup = {}
         visited_nodes = {}
+
 
         while to_be_visited:
             #print(to_be_visited)
             #print(self.to_be_visited)
             #print(self.visited_nodes)
+
             c_node = to_be_visited.popleft()
+
             #print("Prnt",c_node.parent_node.state if c_node.parent_node is not None else "None")
             #print("Crnt", c_node.state)
             #self.print_environment(c_node)
@@ -244,6 +267,7 @@ class Search:
             #print("Agent_i:",indexx, "_pos:",poss)
             #self.display.update(self.environment, poss, trail)
             #wait()
+
             visited_nodes[c_node.state] = 1
             if math.floor(c_node.state) == self.goal_state:
                 print("Found goal state. WIN :)")
@@ -255,13 +279,18 @@ class Search:
 
             # appending the new node to the to be visited list will make it a breath first search (FIFO)
             # adding the new node to the front of the to be visited list will make it depth first search (LIFO)
+            # appendleft for DFS
             for child in children:
                 if child.depth > depth:
                     print(depth)
                     print(len(visited_nodes.keys()))
                     depth = child.depth
                 if visited_nodes.get(child.state) is None:
-                    to_be_visited.append(child)
+                    # check look up of to_be_visited states to avoid adding duplicate states
+                    if to_be_visited_lookup.get(child.state) is None:
+                        to_be_visited.appendleft(child)
+                        to_be_visited_lookup[child.state] = 1
+
         print(visited_nodes)
 
 s = Search('../map.txt')
