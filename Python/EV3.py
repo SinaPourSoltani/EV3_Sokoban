@@ -1,13 +1,32 @@
 #!/usr/bin/python
 import ev3dev.ev3 as ev3
 import signal
+import math
+import time
 from time import sleep
 
 # defines
 STOP_SPEED = 0
-CRUISE_SPEED = 40
-ADJUST_SPEED = CRUISE_SPEED * 1.4
-TURN_SPEED = 30
+MAX_SPEED = 1050
+CALIBRATION_SPEED = 50
+CRUISE_SPEED = 400
+ADJUST_SPEED = CRUISE_SPEED * 1.5
+TURN_SPEED = 500
+
+WHEEL_DIAMETER = 0.08
+WHEEL_CIRCUMFERENCE = WHEEL_DIAMETER * math.pi
+INTERWHEEL_DISTANCE = 0.1565
+WHEEL_SENSOR_DISTANCE = 0.062
+
+FIELD_LENGTH = 0.297
+
+
+ONE_FIELD_ANGLE = 360 * FIELD_LENGTH / WHEEL_CIRCUMFERENCE
+ONE_TURN_ANGLE = 360 * (INTERWHEEL_DISTANCE * math.pi / 4) / WHEEL_CIRCUMFERENCE
+WHEEL_TO_SENSOR_ANGLE = 360 * WHEEL_SENSOR_DISTANCE / WHEEL_CIRCUMFERENCE
+DEPOSIT_ANGLE = 3/5 * ONE_FIELD_ANGLE
+CALIBRATION_ANGLE = 2/5 * ONE_FIELD_ANGLE
+
 
 END = 'X'
 
@@ -49,10 +68,9 @@ INDEX2ORI = {
     DOWN:   'DOWN',
 }
 
-# TODO Use wheel rotations instead of speed for rotations so that speeds can be increased invariant of delay times
 
 class EV3:
-    def __init__(self, start_orientation, solution):
+    def __init__(self, start_orientation, solution, with_calibration=False):
         self.current_orientation = start_orientation
 
         self.m_left = ''
@@ -63,6 +81,11 @@ class EV3:
         self.IS_PUSHING = False
 
         signal.signal(signal.SIGINT, self.signal_handler)
+        if with_calibration:
+            self.calibrate()
+            for i in range(5):
+                print("Starting in", 5-i)
+                sleep(1)
         self.execute(solution)
 
     def signal_handler(self, sig, frame):
@@ -79,12 +102,51 @@ class EV3:
         self.m_right = ev3.LargeMotor('outD')
         self.m_right.polarity = "normal"
         self.m_left.polarity = "normal"
-        self.m_right.duty_cycle_sp = STOP_SPEED
-        self.m_left.duty_cycle_sp = STOP_SPEED
-        self.m_left.run_direct()
-        self.m_right.run_direct()
 
-    def line_follower(self, dir=FORWARD):
+    def calibrate(self):
+        csl_values = []
+        csr_values = []
+        self.set_wheel(self.m_right, CALIBRATION_ANGLE, CALIBRATION_SPEED, REVERSE)
+        self.set_wheel(self.m_left, CALIBRATION_ANGLE, CALIBRATION_SPEED, REVERSE)
+        while self.m_left.state == ['running']:
+            csl_values.append(self.cs_left.value())
+            csr_values.append(self.cs_right.value())
+        self.set_wheel(self.m_right, CALIBRATION_ANGLE, CALIBRATION_SPEED, FORWARD)
+        self.set_wheel(self.m_left, CALIBRATION_ANGLE, CALIBRATION_SPEED, FORWARD)
+        while self.m_left.state == ['running']:
+            csl_values.append(self.cs_left.value())
+            csr_values.append(self.cs_right.value())
+
+        max_val = max(max(csr_values), max(csl_values))
+        min_val = min(min(csr_values), min(csl_values))
+
+        print("Initial color threshold",COLOR_THRESHOLD)
+        global COLOR_THRESHOLD
+        COLOR_THRESHOLD = min_val + (max_val - min_val) / 2
+
+        print("Calibrated color threshold",COLOR_THRESHOLD)
+        '''with open('cs_values.txt', 'w') as file:
+            file.write("CSR\n")
+            file.write("[")
+            for v in csr_values:
+                file.write(str(v))
+                file.write(" ")
+            file.write("]")
+            file.write("\n")
+
+            file.write("CSL\n")
+            file.write("[")
+            for v in csl_values:
+                file.write(str(v))
+                file.write(" ")
+            file.write("]")
+            file.write("\n")'''
+
+    def wait_while(self):
+        self.m_right.wait_while('running')
+        self.m_left.wait_while('running')
+
+    def line_follower(self, num_moves, dir=FORWARD):
         '''
         self.set_speed(self.m_left, STOP_SPEED)
         self.set_speed(self.m_right, STOP_SPEED)
@@ -92,78 +154,61 @@ class EV3:
             print("CSL", self.cs_left.value())
             print("CSR", self.cs_right.value())
         '''
-        while not (self.cs_left.value() < COLOR_THRESHOLD and self.cs_right.value() < COLOR_THRESHOLD):
-            if self.cs_left.value() < COLOR_THRESHOLD: #== BLACK:
-                self.set_speed(self.m_right,ADJUST_SPEED,dir)
-            elif self.cs_right.value() < COLOR_THRESHOLD: #== BLACK:
-                self.set_speed(self.m_left, ADJUST_SPEED,dir)
-            else:
-                self.set_speed(self.m_left, CRUISE_SPEED,dir)
-                self.set_speed(self.m_right, CRUISE_SPEED,dir)
+        fields_moved = 0
+        while fields_moved < num_moves:
+            sleep(0.1)
+            while not (self.cs_left.value() < COLOR_THRESHOLD and self.cs_right.value() < COLOR_THRESHOLD):
+                if self.cs_left.value() < COLOR_THRESHOLD:
+                    self.m_right.run_forever(speed_sp=dir*ADJUST_SPEED)
+                elif self.cs_right.value() < COLOR_THRESHOLD:
+                    self.m_left.run_forever(speed_sp=dir*ADJUST_SPEED)
+                else:
+                    self.m_left.run_forever(speed_sp=dir*CRUISE_SPEED)
+                    self.m_right.run_forever(speed_sp=dir*CRUISE_SPEED)
+            fields_moved += 1
+
+        self.set_wheel(self.m_right, WHEEL_TO_SENSOR_ANGLE, CRUISE_SPEED, dir)
+        self.set_wheel(self.m_left, WHEEL_TO_SENSOR_ANGLE, CRUISE_SPEED, dir)
+        self.wait_while()
 
     def check_next(self, current_move, next_move):
         self.IS_PUSHING = current_move == next_move
 
-    def move_forward(self):
-        print("Moving forward.")
-        # TODO use sensor to detect line of next position
-        self.line_follower()
-        sleep(DELAY_LINE_DETECTED)
+    def move_forward(self, num_times=1):
+        print("Moving forward x", num_times)
+        self.line_follower(num_times, FORWARD)
         self.park()
 
     def move_backward(self):
         print("Moving backwards.")
-        # TODO use sensor to detect line of next position
-        self.line_follower(REVERSE)
-        sleep(DELAY_LINE_DETECTED)
-        self.line_follower(REVERSE)
+        self.line_follower(2, REVERSE)
         self.park()
 
     def deposit(self):
-        self.move_forward()
-        self.move_backward()
+        self.set_wheel(self.m_right, DEPOSIT_ANGLE, CRUISE_SPEED, FORWARD)
+        self.set_wheel(self.m_left, DEPOSIT_ANGLE, CRUISE_SPEED, FORWARD)
+        self.wait_while()
+        self.set_wheel(self.m_right, DEPOSIT_ANGLE, CRUISE_SPEED, REVERSE)
+        self.set_wheel(self.m_left, DEPOSIT_ANGLE, CRUISE_SPEED, REVERSE)
+        self.wait_while()
+        self.park()
 
     def park(self):
         print("Parking.")
-        self.set_speed(self.m_right,STOP_SPEED)
-        self.set_speed(self.m_left,STOP_SPEED)
-        sleep(0.1)
+        self.m_right.stop(stop_action='hold')
+        self.m_left.stop(stop_action='hold')
 
-    def set_speed(self,moter,speed,dir=FORWARD):
-        moter.duty_cycle_sp = dir * speed
+    def set_speed(self,motor,speed,dir=FORWARD):
+        motor.duty_cycle_sp = dir * speed
 
-    def turn_right(self):
-        print("Turning right.")
-        self.set_speed(self.m_left,TURN_SPEED,FORWARD)
-        self.set_speed(self.m_right,TURN_SPEED,REVERSE)
-        # TODO maybe change to check for lines
-        sleep(DELAY_PRE_TURN)
-        while self.cs_right.value() > COLOR_THRESHOLD:
-            pass
-        sleep(DELAY_POST_TURN)
-        self.park()
+    def set_wheel(self,motor,angle,speed,dir):
+        motor.run_to_rel_pos(position_sp=dir*angle, speed_sp=speed, stop_action="hold")
 
-    def turn_left(self):
-        print("Turning left")
-        self.set_speed(self.m_left, TURN_SPEED, REVERSE)
-        self.set_speed(self.m_right, TURN_SPEED, FORWARD)
-        # TODO maybe change to check for lines
-        sleep(DELAY_PRE_TURN)
-        while self.cs_left.value() > COLOR_THRESHOLD:
-            pass
-        sleep(DELAY_POST_TURN)
-        self.park()
-
-    def turn_around(self):
-        print("Turning around.")
-        self.set_speed(self.m_left, TURN_SPEED, REVERSE)
-        self.set_speed(self.m_right, TURN_SPEED, FORWARD)
-        rotations = 0
-        while rotations < 2:
-            if self.cs_left.value() < COLOR_THRESHOLD:
-                rotations += 1
-                sleep(DELAY_POST_TURN)
-
+    def turn(self, direction, amount=1):
+        print("Turning", INDEX2ORI[direction])
+        self.set_wheel(self.m_right, amount * ONE_TURN_ANGLE, TURN_SPEED, FORWARD if direction is LEFT else REVERSE)
+        self.set_wheel(self.m_left, amount * ONE_TURN_ANGLE, TURN_SPEED, REVERSE if direction is LEFT else FORWARD)
+        self.wait_while()
         self.park()
 
     def set_orientation(self, ori):
@@ -172,32 +217,58 @@ class EV3:
         turn = self.current_orientation - ori_index
 
         if turn == -1 or turn == 3:
-            self.turn_right()
+            self.turn(RIGHT)
         elif turn == 1 or turn == -3:
-            self.turn_left()
+            self.turn(LEFT)
         elif turn == -2 or turn == 2:
-            self.turn_around()
+            self.turn(LEFT, 2)
 
         self.current_orientation = ori_index
 
     def execute(self, solution):
+        start = time.time()
+        index_of_move = -1
         for i, move in enumerate(solution):
             print("NEW MOVE:",INDEX2ORI[self.current_orientation], move, "-------------------")
             if move != END:
+                if i <= index_of_move:
+                    continue
+                index_of_move = i
+                num_consecutive_moves = 1
+                while move.lower() == solution[index_of_move + 1].lower():
+                    num_consecutive_moves += 1
+                    index_of_move += 1
+
                 self.set_orientation(move)
-                if move.islower():
-                    self.move_forward()
+                if num_consecutive_moves > 1:
+                    self.move_forward(num_consecutive_moves)
+                    if solution[index_of_move].isupper():
+                        self.deposit()
                 else:
-                    self.check_next(move, solution[i + 1])
-                    if self.IS_PUSHING:
+                    if move.islower():
                         self.move_forward()
                     else:
-                        self.move_forward()
-                        self.deposit()
+                        self.check_next(move, solution[i + 1])
+                        if self.IS_PUSHING:
+                            self.move_forward()
+                        else:
+                            self.move_forward()
+                            self.deposit()
 
             else:
                 self.park()
+        print("Execution time:", time.time() - start)
 
-#solution = "llllUddlluRRRRRdrUUruulldRRlddlluLuulldRurDDullDRdRRRdrUUruurrdLulDulldRddlllluurDldRRRdrUUdlllldlluRRRRRdrU" + END
-solution = "uRRlld"
-eve = EV3(DOWN,solution)
+sltn = "llllUddlluRRRRRdrUUruulldRRlddlluLuulldRurDDullDRdRRRdrUUruurrdLulDulldRddlllluurDldRRRdrUUdlllldlluRRRRRdrU" + END
+#sltn = "urrd" + END
+eve = EV3(LEFT, sltn, with_calibration=True)
+
+'''
+TIMES:
+5:25 
+5:01 : TURN SPEED 250 -> 500
+3:43 : CRUISE SPEED 200 -> 300
+3:43 : CONSECUTIVE MOVES
+3:04 : WITH CALIBRATION CRUISE SPEED 300 -> 400
+
+'''
