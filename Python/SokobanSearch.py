@@ -183,31 +183,9 @@ class Search:
 
     def calculate_cost(self, box_positions, agent_pos, depth):
         cost = 0
-
-        box_cost = 0
         for box in box_positions:
-            box_goal_distance = 0
             for goal in self.goal_positions:
-                distance = abs(box.x - goal.x) + abs(box.y - goal.y)
-                if not distance:
-                    box_goal_distance = 0
-                    break
-                box_goal_distance += 10 * distance
-
-            box_goal_distance /= len(self.goal_positions)
-            box_cost += box_goal_distance
-
-        box_cost /= len(box_positions)
-
-        agent_box_distance = 0
-        for box in box_positions:
-            agent_box_distance += abs(agent_pos.x - box.x) + abs(agent_pos.y - box.y)
-
-        agent_box_distance /= len(box_positions)
-
-        agent_cost = 2 * depth / self.num_spaces # agent_box_distance / (depth + 1) + depth / agent_box_distance
-
-        cost = box_cost + agent_cost
+                cost += abs(box.x - goal.x) + abs(box.y - goal.y) + depth
 
         return cost
 
@@ -352,8 +330,8 @@ class Search:
                         self.to_be_visited_lookup[child.state] = 1
 
 
-map_path = os.path.join(os.path.pardir, "maps", "map.txt")
+map_path = os.path.join(os.path.pardir, "maps", "map1.txt")
 s = Search(map_path)
 s.search(Algorithms.BFS)
-s.search(Algorithms.DFS)
+#s.search(Algorithms.DFS)
 s.search(Algorithms.AStar)

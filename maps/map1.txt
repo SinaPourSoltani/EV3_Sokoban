@@ -1,7 +1,7 @@
 XXXXXXXXXX
 X.....G..X
 X..GG....X
-X..JJJ...X
-X.GJ...M.X
+X..JXJ...X
+X.GJ.J.M.X
 X........X
 XXXXXXXXXX
