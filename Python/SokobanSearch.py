@@ -352,9 +352,8 @@ class Search:
                         self.to_be_visited_lookup[child.state] = 1
 
 
-# TODO
 map_path = os.path.join(os.path.pardir, "maps", "map.txt")
 s = Search(map_path)
 s.search(Algorithms.BFS)
-#s.search(Algorithms.DFS)
-#s.search(Algorithms.AStar)
+s.search(Algorithms.DFS)
+s.search(Algorithms.AStar)
