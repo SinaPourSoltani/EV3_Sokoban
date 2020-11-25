@@ -356,6 +356,7 @@ class Search:
 
 
 
+
 while True:
     mg = MapGenerator(10,10)
     #map_path = os.path.join(os.path.pardir, "maps", "map.txt")
@@ -364,3 +365,8 @@ while True:
     #s.search(Algorithms.DFS)
     s.search(Algorithms.AStar)
     input()
+map_path = os.path.join(os.path.pardir, "maps", "map.txt")
+s = Search(map_path)
+s.search(Algorithms.BFS)
+s.search(Algorithms.DFS)
+s.search(Algorithms.AStar)
