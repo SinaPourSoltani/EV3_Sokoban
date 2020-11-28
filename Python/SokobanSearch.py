@@ -87,7 +87,7 @@ class Search:
         assert self.num_spaces < 100
         assert self.agent_state > 0
         assert len(self.pos2index.keys()) == self.num_spaces
-        assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
+        #assert len(self.boxes_positions2state.keys()) == math.comb(self.num_spaces,self.num_boxes)
 
         self.goal_state = self.get_goal_state()
         self.goal_positions = self.boxes_state2positions[self.goal_state]
@@ -120,14 +120,22 @@ class Search:
         for y in range(self.rows):
             for x in range(self.cols):
                 if self.environment[y][x] != WALL and self.environment[y][x] != GOAL:
+                    moves = []
                     num_surrounding_walls = 0
                     env_pos = Pos(x,y)
                     for move in self.moves:
                         surrounding_space = env_pos + move
                         if self.environment[surrounding_space.y][surrounding_space.x] == WALL:
+                            moves.append(move)
                             num_surrounding_walls += 1
                     if num_surrounding_walls >= 2:
-                        corners.append(env_pos)
+                        for i, m in enumerate(moves):
+                            if(self.moves.index(m) == self.moves.index(moves[i-1]) + 1 or self.moves.index(m) == self.moves.index(moves[i-1]) - 1):
+                                corners.append(env_pos)
+                                break
+                            elif(self.moves.index(m) == 3 and self.moves.index(moves[i-1]) == 0 or self.moves.index(m) == 0 and self.moves.index(moves[i-1]) == 3):
+                                corners.append(env_pos)
+                                break;
         return corners
 
     def print_environment(self,node: Node):
@@ -195,7 +203,6 @@ class Search:
 
         boxes_state = math.floor(node.state)
         boxes_positions = self.boxes_state2positions[boxes_state]
-
         children = []
 
         for move in self.moves:
@@ -203,6 +210,7 @@ class Search:
             new_agent_state = self.pos2index.get(next_agent_pos)
             if new_agent_state is None:
                 continue
+
 
             new_boxes_positions = ()
             for box_pos in boxes_positions:
@@ -214,10 +222,11 @@ class Search:
 
             new_boxes_positions = tuple(sorted(new_boxes_positions))
             new_boxes_state = self.boxes_positions2state.get(new_boxes_positions)
-            # If new_boxes_state is None it means that the boxes positions are not possible
+            # If new_boxes_state is None it meSans that the boxes positions are not possible
             # if new_boxes_state is negative it indicates a deadlock
             if new_boxes_state is None or new_boxes_state < 0:
                 continue
+
 
             new_state = new_boxes_state + new_agent_state / 100
             cost = 0
@@ -299,9 +308,11 @@ class Search:
         self.to_be_visited_lookup = {}
         self.visited_nodes = {}
 
+        print(self.corners)
         while self.to_be_visited:
-
             c_node = self.to_be_visited.popleft()
+
+
 
             self.visited_nodes[c_node.state] = 1
             if math.floor(c_node.state) == self.goal_state:
@@ -311,7 +322,6 @@ class Search:
                 break
 
             children = self.generate_children(c_node, with_cost=(algorithm == Algorithms.AStar))
-
             # appending the new node to the to be visited list will make it a breath first search (FIFO)
             # adding the new node to the front of the to be visited list will make it depth first search (LIFO)
 
@@ -330,8 +340,9 @@ class Search:
                         self.to_be_visited_lookup[child.state] = 1
 
 
-map_path = os.path.join(os.path.pardir, "maps", "map1.txt")
+
+map_path = os.path.join("maps", "map2.txt")
 s = Search(map_path)
 s.search(Algorithms.BFS)
 #s.search(Algorithms.DFS)
-s.search(Algorithms.AStar)
+#s.search(Algorithms.AStar)
