@@ -9,9 +9,9 @@ from time import sleep
 STOP_SPEED = 0
 MAX_SPEED = 1050
 CALIBRATION_SPEED = 50
-CRUISE_SPEED = 400
+CRUISE_SPEED = 500
 ADJUST_SPEED = CRUISE_SPEED * 1.5
-TURN_SPEED = 500
+TURN_SPEED = 600
 
 WHEEL_DIAMETER = 0.08
 WHEEL_CIRCUMFERENCE = WHEEL_DIAMETER * math.pi
@@ -259,7 +259,7 @@ class EV3:
                 self.park()
         print("Execution time:", time.time() - start)
 
-sltn = "llllUddlluRRRRRdrUUruulldRRlddlluLuulldRurDDullDRdRRRdrUUruurrdLulDulldRddlllluurDldRRRdrUUdlllldlluRRRRRdrU" + END
+sltn = "llldLLLLulDDrrddrrurUdldlluuurrurrDLLLLLrrrurrrrdLLrdLuLLLLulDDrddrrurUruLLLLulDulD" + END
 #sltn = "urrd" + END
 eve = EV3(LEFT, sltn, with_calibration=True)
 

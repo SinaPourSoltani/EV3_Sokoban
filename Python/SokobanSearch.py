@@ -308,7 +308,7 @@ class Search:
         self.to_be_visited_lookup = {}
         self.visited_nodes = {}
 
-        print(self.corners)
+        #print(self.corners)
         while self.to_be_visited:
             c_node = self.to_be_visited.popleft()
 
@@ -341,7 +341,7 @@ class Search:
 
 
 
-map_path = os.path.join("maps", "map2.txt")
+map_path = os.path.join(os.pardir, "maps", "contest.txt")
 s = Search(map_path)
 s.search(Algorithms.BFS)
 #s.search(Algorithms.DFS)
